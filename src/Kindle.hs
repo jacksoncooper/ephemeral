@@ -45,15 +45,14 @@ isHighlight = isPrefixOf "Highlight" . drop 1
 
 toHighlight :: String -> Maybe Highlight
 toHighlight line =
-  -- This is very bad.
-  let attributes = split ',' line in
+  let attributes = columns line in
   if isHighlight line && length attributes == 4
   then Just $
     Highlight
-      (toColor . inQuotes $ attributes !! 0)
-      (toLocation . inQuotes $ attributes !! 1)
-      (toStarred . inQuotes $ attributes !! 2)
-      (inQuotes $ attributes !! 3)
+      (toColor $ attributes !! 0)
+      (toLocation $ attributes !! 1)
+      (toStarred $ attributes !! 2)
+      (attributes !! 3)
   else Nothing
 
 readHighlights :: FilePath -> IO [Maybe Highlight]
@@ -70,13 +69,21 @@ between start end =
 inParentheses :: String -> String
 inParentheses = between '(' ')'
 
-inQuotes :: String -> String
-inQuotes = between '"' '"'
+columns :: String -> [String]
+columns = reverse . columns' . reverse 
 
-split :: Char -> String -> [String]
-split character text =
-  -- TODO: This destroys highlights that have commas in them because Amazon
-  -- doesn't sanitize the annotations export.
-  let (head, rest) = drop 1 <$> break (== ',') text in
-  if head == "" then []
-  else head : split character rest
+columns' :: String -> [String]
+columns' = go False [] '"'
+  where
+    go :: Bool -> String -> Char -> String -> [String]
+    go _ _ _ [] = []
+    go consume column toggle (head : rest) =
+      if head == toggle then
+        let remaining = go (not consume) [] toggle rest in
+        if consume
+        then column : remaining
+        else remaining
+      else
+        if consume
+        then go True (head : column) toggle rest
+        else go False [] toggle rest
