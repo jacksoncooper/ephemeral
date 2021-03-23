@@ -2,88 +2,122 @@ module Kindle where
 
 import Data.Char (toLower)
 import Data.List (isPrefixOf, stripPrefix)
+import Data.Maybe (isJust)
 
-type Author = String
-type Title = String
+data Color = Pink | Blue | Yellow | Orange
+  deriving Show
 
 type Location = String
 type Starred = Bool
 type Excerpt = String
 
-type Annotation = Either Highlight Note
-
-data Color = Pink | Blue | Yellow | Orange
+data Annotation =
+    Highlight Color Location Starred Excerpt
+  | Note Location Starred Excerpt
   deriving Show
 
-data Export =
-  Export
-    (Maybe Author)
-    (Maybe Title)
-    [Annotation]
+data Type
+  = Highlight'
+  | Note'
   deriving Show
 
-data Highlight =
-  Highlight
-    (Maybe Color)
-    Location
-    (Maybe Starred)
-    Excerpt
+data Report a =
+    Success a
+  | Error [String]
   deriving Show
 
-data Note =
-  Note
-    Location
-    (Maybe Starred)
-    Excerpt
-  deriving Show
+instance Functor Report where
+  fmap f (Success a) = Success (f a)
+  fmap f (Error errors) = Error errors
 
-toAnnotationType :: String -> String
-toAnnotationType = map toLower . takeWhile (/= ' ')
+instance Applicative Report where
+  pure = Success
+  (Success f) <*> (Success a) = Success (f a)
+  (Success _) <*> (Error errors) = Error errors
+  (Error errors) <*> (Success _) = Error errors
+  (Error errors) <*> (Error more) = Error (errors ++ more)
 
-toColor :: String -> Maybe Color
+toType :: String -> Report Type
+toType text =
+  let
+    kind  = map toLower (takeWhile (/= ' ') text)
+    error = "'" ++ kind ++ "' not a recognized annotation type."
+  in
+    case kind of
+      "highlight" -> Success Highlight'
+      "note"      -> Success Note'
+      _           -> Error [error]
+
+toColor :: String -> Report Color
 toColor text =
-  case inParentheses text of
-    "Pink"   -> Just Pink
-    "Blue"   -> Just Blue
-    "Yellow" -> Just Yellow
-    "Orange" -> Just Orange
-    _        -> Nothing
+  let
+    color = inParentheses text
+    error = "'" ++ color ++ "' not one of Pink, Blue, Yellow, Orange."
+  in
+    case color of
+      "Pink"   -> Success Pink
+      "Blue"   -> Success Blue
+      "Yellow" -> Success Yellow
+      "Orange" -> Success Orange
+      _        -> Error [error]
 
-toStarred :: String -> Maybe Bool
+toLocation :: String -> Report String
+toLocation = Success . map toLower
+
+toStarred :: String -> Report Bool
 toStarred text =
-  case text of
-    "Y" -> Just True
-    ""  -> Just False
-    _   -> Nothing
+  let
+    error = "'" ++ text ++ "' not one of Y or empty."
+  in
+    case text of
+      "Y" -> Success True
+      ""  -> Success False
+      _   -> Error [error]
 
-toAnnotation :: String -> Maybe Annotation
-toAnnotation line =
-  let attributes = columns line in
-  if length attributes == 4 then
-    let
-      color = toColor $ attributes !! 0
-      annotationType = toAnnotationType $ attributes !! 0
-      location = attributes !! 1
-      starred = toStarred $ attributes !! 2
-      excerpt = attributes !! 3
-    in case annotationType of
-      "highlight" -> Just (Left (Highlight color location starred excerpt))
-      "note"      -> Just (Right (Note location starred excerpt))
-      _           -> Nothing
-  else
-    Nothing
-
-toLines :: String -> [String]
-toLines =
-  let linesOfMetadata = 8 in
-  drop linesOfMetadata . lines
+toAnnotation :: String -> Report Annotation
+toAnnotation text =
+  let
+    attributes = columns text
+    number = length attributes
+    expected = 4
+    notFour = "Encountered " ++ show number ++ " attributes instead of " ++ show expected ++ "."
+  in
+    if number == expected then
+      let
+        color = toColor (attributes !! 0)
+        kind = toType (attributes !! 0)
+        location = toLocation (attributes !! 1)
+        starred = toStarred (attributes !! 2)
+        excerpt = pure (attributes !! 3)
+      in case kind of
+        Success Highlight' ->
+          Highlight <$> color <*> location <*> starred <*> excerpt
+        Success Note' ->
+          Note <$> location <*> starred <*> excerpt
+        Error errors -> Error errors
+    else
+      Error [notFour]
 
 readAnnotations :: FilePath -> IO [Maybe Annotation]
-readAnnotations highlights =
-  (map toAnnotation . toLines) <$> readFile highlights
+readAnnotations path =
+  readFile path >>= \text ->
+    let annotations = zip [1..] (lines text)
+    in traverse (uncurry readAnnotation) annotations
+
+readAnnotation :: Int -> String -> IO (Maybe Annotation)
+readAnnotation line text =
+  case toAnnotation text of
+    Success annotation ->
+      return (Just annotation)
+    Error errors ->
+      let bullets = map ("  - " ++) errors
+      in
+        putStrLn ("Line " ++ show line ++ ":")
+          >> mapM_ putStrLn bullets
+          >> return Nothing
 
 columns :: String -> [String]
-columns = reverse . columns' . reverse 
+columns = map reverse . columns'
 
 columns' :: String -> [String]
 columns' = go False [] '"'
