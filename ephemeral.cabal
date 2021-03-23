@@ -5,23 +5,17 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           ephemeral
-version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/ephemeral#readme>
-homepage:       https://github.com/githubuser/ephemeral#readme
-bug-reports:    https://github.com/githubuser/ephemeral/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2021 Author name here
-license:        BSD3
-license-file:   LICENSE
+version:        0.0.0
+description:    Review interesting vocabulary from your e-reader.
+homepage:       https://github.com/jacksoncooper/ephemeral#readme
+bug-reports:    https://github.com/jacksoncooper/ephemeral/issues
 build-type:     Simple
 extra-source-files:
     README.md
-    ChangeLog.md
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/ephemeral
+  location: https://github.com/jacksoncooper/ephemeral
 
 library
   exposed-modules:

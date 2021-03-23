@@ -80,7 +80,12 @@ toAnnotation text =
     attributes = columns text
     number = length attributes
     expected = 4
-    notFour = "Encountered " ++ show number ++ " attributes instead of " ++ show expected ++ "."
+    notFour =
+      "Encountered "
+        ++ show number ++ " "
+        ++ (if number /= 1 then "attributes" else "attribute")
+        ++ " instead of "
+        ++ show expected ++ "."
   in
     if number == expected then
       let
