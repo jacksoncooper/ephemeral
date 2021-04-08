@@ -2,7 +2,7 @@ module Kindle where
 
 import Data.Char (toLower)
 import Data.List (isPrefixOf, stripPrefix)
-import Data.Maybe (isJust)
+import Data.Maybe (catMaybes)
 
 data Color = Pink | Blue | Yellow | Orange
   deriving Show
@@ -21,6 +21,17 @@ data Type
   | Note'
   deriving Show
 
+type Title = String
+type Author = String
+
+data Metadata =
+  Metadata Author Title
+  deriving Show
+
+data Export =
+  Export Metadata [Annotation]
+  deriving Show
+
 data Report a =
     Success a
   | Error [String]
@@ -32,10 +43,22 @@ instance Functor Report where
 
 instance Applicative Report where
   pure = Success
-  (Success f) <*> (Success a) = Success (f a)
-  (Success _) <*> (Error errors) = Error errors
-  (Error errors) <*> (Success _) = Error errors
-  (Error errors) <*> (Error more) = Error (errors ++ more)
+  Success f <*> Success a = Success (f a)
+  Success _ <*> Error errors = Error errors
+  Error errors <*> Success _ = Error errors
+  Error errors <*> Error more = Error (errors ++ more)
+
+instance Monad Report where
+  Success a >>= f = f a
+  Error errors >>= _ = Error errors
+
+-- TODO: Explicitly look for text starting with 'by'.
+
+toAuthor :: String -> Report String
+toAuthor  = Success . map toLower . drop 1 . dropWhile (/= ' ')
+
+toTitle :: String -> Report String
+toTitle = toLocation
 
 toType :: String -> Report Type
 toType text =
@@ -76,50 +99,19 @@ toStarred text =
 
 toAnnotation :: String -> Report Annotation
 toAnnotation text =
-  let
-    attributes = columns text
-    number = length attributes
-    expected = 4
-    notFour =
-      "Encountered "
-        ++ show number ++ " "
-        ++ (if number /= 1 then "attributes" else "attribute")
-        ++ " instead of "
-        ++ show expected ++ "."
-  in
-    if number == expected then
+    expectCells 4 text >>= \cells ->
       let
-        color = toColor (attributes !! 0)
-        kind = toType (attributes !! 0)
-        location = toLocation (attributes !! 1)
-        starred = toStarred (attributes !! 2)
-        excerpt = pure (attributes !! 3)
+        color = toColor (cells !! 0)
+        kind = toType (cells !! 0)
+        location = toLocation (cells !! 1)
+        starred = toStarred (cells !! 2)
+        excerpt = pure (cells !! 3)
       in case kind of
         Success Highlight' ->
           Highlight <$> color <*> location <*> starred <*> excerpt
         Success Note' ->
           Note <$> location <*> starred <*> excerpt
         Error errors -> Error errors
-    else
-      Error [notFour]
-
-readAnnotations :: FilePath -> IO [Maybe Annotation]
-readAnnotations path =
-  readFile path >>= \text ->
-    let annotations = zip [1..] (lines text)
-    in traverse (uncurry readAnnotation) annotations
-
-readAnnotation :: Int -> String -> IO (Maybe Annotation)
-readAnnotation line text =
-  case toAnnotation text of
-    Success annotation ->
-      return (Just annotation)
-    Error errors ->
-      let bullets = map ("  - " ++) errors
-      in
-        putStrLn ("Line " ++ show line ++ ":")
-          >> mapM_ putStrLn bullets
-          >> return Nothing
 
 columns :: String -> [String]
 columns = map reverse . columns'
@@ -146,3 +138,74 @@ between start end =
 
 inParentheses :: String -> String
 inParentheses = between '(' ')'
+
+expectCells :: Int -> String -> Report [String]
+expectCells expected text =
+  let cells = columns text in
+  expectLength "attribute" "attributes" expected cells >> return cells
+
+expectLength :: String -> String -> Int -> [a] -> Report ()
+expectLength what whats expected items =
+  let
+    number = length items
+    error =
+      "Expected " ++ show expected ++ " "
+        ++ (if expected == 1 then what else whats) ++ " but got "
+        ++ show number ++ "."
+  in
+    if number == expected
+    then Success ()
+    else Error [error]
+
+readMetadata :: FilePath -> IO (Maybe Metadata)
+readMetadata path =
+  readFile path >>= \text ->
+    let
+      number = 5
+      lines' = take number (lines text)
+      report =
+        expectLength "line" "lines" number lines' >>
+          let
+            title = expectCells 1 (lines' !! 1) >>= toTitle . head
+            author = expectCells 1 (lines' !! 2) >>= toAuthor . head
+          in
+            Metadata <$> author <*> title
+    in
+      case report of
+        Success metadata ->
+          return (Just metadata)
+        Error errors -> 
+          putStrLn ("Lines 1 through " ++ show number ++ ":")
+            >> printBullets errors
+            >> return Nothing
+
+readAnnotation :: Int -> String -> IO (Maybe Annotation)
+readAnnotation line text =
+  case toAnnotation text of
+    Success annotation ->
+      return (Just annotation)
+    Error errors ->
+        putStrLn ("Line " ++ show line ++ ":")
+          >> printBullets errors
+          >> return Nothing
+
+readAnnotations :: FilePath -> IO [Annotation]
+readAnnotations path =
+  readFile path >>= \text ->
+    let
+      lines' = zip [1..] (lines text)
+      annotations = traverse (uncurry readAnnotation) lines'
+    in
+      annotations >>= return . catMaybes
+
+printBullets :: [String] -> IO ()
+printBullets items =
+  let bullets = map ("  - " ++) items
+  in mapM_ putStrLn bullets
+
+excerpt :: Annotation -> String
+excerpt (Highlight _ _ _ excerpt) = excerpt
+excerpt (Note _ _ excerpt) = excerpt
+
+printAnnotations :: FilePath -> IO ()
+printAnnotations path = readAnnotations path >>= mapM_ (putStrLn . excerpt)
