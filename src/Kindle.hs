@@ -52,6 +52,19 @@ instance Monad Report where
   Success a >>= f = f a
   Error errors >>= _ = Error errors
 
+excerpt :: Annotation -> String
+excerpt (Highlight _ _ _ excerpt) = excerpt
+excerpt (Note _ _ excerpt) = excerpt
+
+elide :: String -> String
+elide text =
+  let
+    words' = words text
+  in
+    if length words' > 10
+    then (unwords . take 10) words' ++ "…"
+    else text
+
 -- TODO: Explicitly look for text starting with 'by'.
 
 toAuthor :: String -> Report String
@@ -203,9 +216,6 @@ printBullets items =
   let bullets = map ("  - " ++) items
   in mapM_ putStrLn bullets
 
-excerpt :: Annotation -> String
-excerpt (Highlight _ _ _ excerpt) = excerpt
-excerpt (Note _ _ excerpt) = excerpt
-
 printAnnotations :: FilePath -> IO ()
-printAnnotations path = readAnnotations path >>= mapM_ (putStrLn . excerpt)
+printAnnotations path =
+  readAnnotations path >>= mapM_ (putStrLn . elide . excerpt)
