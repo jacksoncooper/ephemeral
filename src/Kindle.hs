@@ -1,8 +1,15 @@
 module Kindle where
 
 import Data.Char (toLower)
-import Data.List (isPrefixOf, stripPrefix)
 import Data.Maybe (catMaybes)
+
+-- TODO:
+-- 1. Write parse errors to file instead of standard output.
+-- 2. Explicitly look for text starting with 'by' when parsing author, error
+--    with something like
+--      Expected 'by' to come before author name but found 'bleh'.
+-- 3. Parse errors in author and title are ambiguous and don't include a line
+--    number.
 
 data Color = Pink | Blue | Yellow | Orange
   deriving Show
@@ -28,8 +35,10 @@ data Metadata =
   Metadata Author Title
   deriving Show
 
-data Export =
-  Export Metadata [Annotation]
+data Export = Export
+  { exportMetadata :: Metadata
+  , exportAnnotations :: [Annotation]
+  }
   deriving Show
 
 data Report a =
@@ -56,16 +65,17 @@ excerpt :: Annotation -> String
 excerpt (Highlight _ _ _ excerpt) = excerpt
 excerpt (Note _ _ excerpt) = excerpt
 
+labelAndItemize :: String -> Report a -> Report a
+labelAndItemize more (Error errors) = Error (more : map ("  - " ++ ) errors)
+labelAndItemize _ report = report
+
 elide :: String -> String
 elide text =
-  let
-    words' = words text
+  let words' = words text
   in
     if length words' > 10
     then (unwords . take 10) words' ++ "…"
     else text
-
--- TODO: Explicitly look for text starting with 'by'.
 
 toAuthor :: String -> Report String
 toAuthor  = Success . map toLower . drop 1 . dropWhile (/= ' ')
@@ -87,14 +97,14 @@ toType text =
 toColor :: String -> Report Color
 toColor text =
   let
-    color = inParentheses text
-    error = "'" ++ color ++ "' not one of Pink, Blue, Yellow, Orange."
+    color = (map toLower . inParentheses) text
+    error = "'" ++ color ++ "' not one of 'pink', 'blue', 'yellow', 'orange'."
   in
     case color of
-      "Pink"   -> Success Pink
-      "Blue"   -> Success Blue
-      "Yellow" -> Success Yellow
-      "Orange" -> Success Orange
+      "pink"   -> Success Pink
+      "blue"   -> Success Blue
+      "yellow" -> Success Yellow
+      "orange" -> Success Orange
       _        -> Error [error]
 
 toLocation :: String -> Report String
@@ -102,8 +112,7 @@ toLocation = Success . map toLower
 
 toStarred :: String -> Report Bool
 toStarred text =
-  let
-    error = "'" ++ text ++ "' not one of Y or empty."
+  let error = "'" ++ text ++ "' not one of Y or ''."
   in
     case text of
       "Y" -> Success True
@@ -126,6 +135,19 @@ toAnnotation text =
           Note <$> location <*> starred <*> excerpt
         Error errors -> Error errors
 
+toMetadata :: [String] -> Report Metadata
+toMetadata lines' =
+    let title  = expectCells 1 (lines' !! 1) >>= toTitle . head
+        author = expectCells 1 (lines' !! 2) >>= toAuthor . head
+    in  Metadata <$> author <*> title
+
+between :: Eq a => a -> a -> [a] -> [a]
+between start end =
+  takeWhile (/= end) . drop 1 . dropWhile (/= start)
+
+inParentheses :: String -> String
+inParentheses = between '(' ')'
+
 columns :: String -> [String]
 columns = map reverse . columns'
 
@@ -145,13 +167,6 @@ columns' = go False [] '"'
         then go True (head : column) toggle rest
         else go False [] toggle rest
 
-between :: Eq a => a -> a -> [a] -> [a]
-between start end =
-  takeWhile (/= end) . drop 1 . dropWhile (/= start)
-
-inParentheses :: String -> String
-inParentheses = between '(' ')'
-
 expectCells :: Int -> String -> Report [String]
 expectCells expected text =
   let cells = columns text in
@@ -160,62 +175,52 @@ expectCells expected text =
 expectLength :: String -> String -> Int -> [a] -> Report ()
 expectLength what whats expected items =
   let
-    number = length items
+    length' = length items
     error =
       "Expected " ++ show expected ++ " "
-        ++ (if expected == 1 then what else whats) ++ " but got "
-        ++ show number ++ "."
+        ++ (if expected == 1 then what else whats) ++ " but found "
+        ++ show length' ++ "."
   in
-    if number == expected
+    if length' == expected
     then Success ()
     else Error [error]
 
-readMetadata :: FilePath -> IO (Maybe Metadata)
-readMetadata path =
+readExport :: FilePath -> IO (Maybe Export)
+readExport path =
   readFile path >>= \text ->
     let
-      number = 5
-      lines' = take number (lines text)
-      report =
-        expectLength "line" "lines" number lines' >>
-          let
-            title = expectCells 1 (lines' !! 1) >>= toTitle . head
-            author = expectCells 1 (lines' !! 2) >>= toAuthor . head
-          in
-            Metadata <$> author <*> title
+      lines' = lines text
+      preambleLength = 8
+      preambleLines = take preambleLength lines'
+      annotationLines = drop preambleLength lines'
+      preambleError =
+        "Parse error in preamble on lines 1 through " ++ show preambleLength ++ "."
+      annotationError line =
+        "Parse error in annotation on line " ++ show (line + preambleLength) ++ "."
+      annotations =
+        (sequenceA . map (\(line, text) ->
+          (labelAndItemize (annotationError line) . toAnnotation) text))
+          (zip [1..] annotationLines)
+      metadata =
+        labelAndItemize preambleError
+          (expectLength "line" "lines" preambleLength preambleLines >> toMetadata preambleLines)
+      report = Export <$> metadata <*> annotations
     in
       case report of
-        Success metadata ->
-          return (Just metadata)
-        Error errors -> 
-          putStrLn ("Lines 1 through " ++ show number ++ ":")
-            >> printBullets errors
-            >> return Nothing
+        Success export ->
+          return (Just export)
+        Error errors ->
+          mapM_ putStrLn errors >> return Nothing
 
-readAnnotation :: Int -> String -> IO (Maybe Annotation)
-readAnnotation line text =
-  case toAnnotation text of
-    Success annotation ->
-      return (Just annotation)
-    Error errors ->
-        putStrLn ("Line " ++ show line ++ ":")
-          >> printBullets errors
-          >> return Nothing
-
-readAnnotations :: FilePath -> IO [Annotation]
-readAnnotations path =
-  readFile path >>= \text ->
+printExport :: FilePath -> IO ()
+printExport path =
+  readExport path >>= \export ->
     let
-      lines' = zip [1..] (lines text)
-      annotations = traverse (uncurry readAnnotation) lines'
+      toReadable =
+        \(number, annotation) -> show number ++ ": " ++ (elide . excerpt) annotation
     in
-      annotations >>= return . catMaybes
-
-printBullets :: [String] -> IO ()
-printBullets items =
-  let bullets = map ("  - " ++) items
-  in mapM_ putStrLn bullets
-
-printAnnotations :: FilePath -> IO ()
-printAnnotations path =
-  readAnnotations path >>= mapM_ (putStrLn . elide . excerpt)
+      case export of
+        Just (Export (Metadata author title) annotations) ->
+             putStrLn ("Excerpts from '" ++ title ++ "' by '" ++ author ++ "'.")
+          >> (mapM_ putStrLn . map toReadable) (zip [1..] annotations)
+        Nothing -> return ()

@@ -4,7 +4,7 @@ github:  "jacksoncooper/ephemeral"
 extra-source-files:
 - README.md
 
-description: Review interesting vocabulary from your e-reader.
+description: Dredge up highlighted words from e-books.
 
 dependencies:
 - base >= 4.7 && < 5

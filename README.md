@@ -1,1 +1,1 @@
-Review interesting vocabulary from your e-reader.
+Dredge up highlighted words from e-books.
