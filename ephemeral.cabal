@@ -21,6 +21,7 @@ library
   exposed-modules:
       Kindle
       Lib
+      Report
   other-modules:
       Paths_ephemeral
   hs-source-dirs:

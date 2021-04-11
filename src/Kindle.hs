@@ -1,15 +1,8 @@
 module Kindle where
 
-import Data.Char (toLower)
-import Data.Maybe (catMaybes)
+import Data.Char (toLower, toUpper)
 
--- TODO:
--- 1. Write parse errors to file instead of standard output.
--- 2. Explicitly look for text starting with 'by' when parsing author, error
---    with something like
---      Expected 'by' to come before author name but found 'bleh'.
--- 3. Parse errors in author and title are ambiguous and don't include a line
---    number.
+import Report (Report(..), labelAndItemize)
 
 data Color = Pink | Blue | Yellow | Orange
   deriving Show
@@ -28,46 +21,20 @@ data Type
   | Note'
   deriving Show
 
-type Title = String
 type Author = String
+type Title = String
 
 data Metadata =
   Metadata Author Title
   deriving Show
 
-data Export = Export
-  { exportMetadata :: Metadata
-  , exportAnnotations :: [Annotation]
-  }
+data Export =
+  Export Metadata [Annotation]
   deriving Show
-
-data Report a =
-    Success a
-  | Error [String]
-  deriving Show
-
-instance Functor Report where
-  fmap f (Success a) = Success (f a)
-  fmap f (Error errors) = Error errors
-
-instance Applicative Report where
-  pure = Success
-  Success f <*> Success a = Success (f a)
-  Success _ <*> Error errors = Error errors
-  Error errors <*> Success _ = Error errors
-  Error errors <*> Error more = Error (errors ++ more)
-
-instance Monad Report where
-  Success a >>= f = f a
-  Error errors >>= _ = Error errors
 
 excerpt :: Annotation -> String
 excerpt (Highlight _ _ _ excerpt) = excerpt
 excerpt (Note _ _ excerpt) = excerpt
-
-labelAndItemize :: String -> Report a -> Report a
-labelAndItemize more (Error errors) = Error (more : map ("  - " ++ ) errors)
-labelAndItemize _ report = report
 
 elide :: String -> String
 elide text =
@@ -77,11 +44,34 @@ elide text =
     then (unwords . take 10) words' ++ "…"
     else text
 
+capitalize :: String -> String
+capitalize (first : rest) = toUpper first : rest
+
+capitalize' :: String -> String
+capitalize' word =
+  let
+    conjunctions = ["and", "as", "but", "for", "if", "nor", "or", "so", "yet"]
+    articles = ["a", "an", "the"]
+    prepositions = ["as", "at", "by", "for", "in", "of", "off", "on", "per", "to", "up", "via"]
+    ignore = conjunctions ++ articles ++ prepositions
+  in
+    if word `elem` ignore
+    then word
+    else capitalize word
+
+title :: String -> String
+title text =
+  let
+    words' = words text
+    first : rest = words'
+  in
+    unwords (capitalize first : map capitalize' rest)
+
 toAuthor :: String -> Report String
-toAuthor  = Success . map toLower . drop 1 . dropWhile (/= ' ')
+toAuthor  = Success . drop 1 . dropWhile (/= ' ')
 
 toTitle :: String -> Report String
-toTitle = toLocation
+toTitle = Success . title . map toLower
 
 toType :: String -> Report Type
 toType text =
@@ -141,6 +131,29 @@ toMetadata lines' =
         author = expectCells 1 (lines' !! 2) >>= toAuthor . head
     in  Metadata <$> author <*> title
 
+toExport :: [String] -> Report Export
+toExport lines' =
+    let
+      preambleLength = 8
+      preambleLines = take preambleLength lines'
+      annotationLines = drop preambleLength lines'
+      preambleError =
+        "Parse error in preamble on lines 1 through "
+          ++ show preambleLength ++ "."
+      annotationError number =
+        "Parse error in annotation on line "
+          ++ show (preambleLength + number) ++ "."
+      annotationsReport =
+        (sequenceA . map (\(line, text) ->
+          (labelAndItemize (annotationError line) . toAnnotation) text))
+          (zip [1..] annotationLines)
+      metadataReport =
+        labelAndItemize preambleError
+          (expectLength "line" "lines" preambleLength preambleLines
+            >> toMetadata preambleLines)
+      in
+        Export <$> metadataReport <*> annotationsReport
+
 between :: Eq a => a -> a -> [a] -> [a]
 between start end =
   takeWhile (/= end) . drop 1 . dropWhile (/= start)
@@ -167,11 +180,6 @@ columns' = go False [] '"'
         then go True (head : column) toggle rest
         else go False [] toggle rest
 
-expectCells :: Int -> String -> Report [String]
-expectCells expected text =
-  let cells = columns text in
-  expectLength "attribute" "attributes" expected cells >> return cells
-
 expectLength :: String -> String -> Int -> [a] -> Report ()
 expectLength what whats expected items =
   let
@@ -185,42 +193,32 @@ expectLength what whats expected items =
     then Success ()
     else Error [error]
 
-readExport :: FilePath -> IO (Maybe Export)
-readExport path =
-  readFile path >>= \text ->
-    let
-      lines' = lines text
-      preambleLength = 8
-      preambleLines = take preambleLength lines'
-      annotationLines = drop preambleLength lines'
-      preambleError =
-        "Parse error in preamble on lines 1 through " ++ show preambleLength ++ "."
-      annotationError line =
-        "Parse error in annotation on line " ++ show (line + preambleLength) ++ "."
-      annotations =
-        (sequenceA . map (\(line, text) ->
-          (labelAndItemize (annotationError line) . toAnnotation) text))
-          (zip [1..] annotationLines)
-      metadata =
-        labelAndItemize preambleError
-          (expectLength "line" "lines" preambleLength preambleLines >> toMetadata preambleLines)
-      report = Export <$> metadata <*> annotations
-    in
-      case report of
+expectCells :: Int -> String -> Report [String]
+expectCells expected text =
+  let cells = columns text in
+  expectLength "attribute" "attributes" expected cells >> return cells
+
+writeExport :: FilePath -> IO (Maybe Export)
+writeExport path =
+  let log = "kindle.log"
+  in
+    readFile path >>= \text ->
+      case toExport (lines text) of
         Success export ->
           return (Just export)
         Error errors ->
-          mapM_ putStrLn errors >> return Nothing
+          writeFile log (unlines errors) >> return Nothing
 
 printExport :: FilePath -> IO ()
 printExport path =
-  readExport path >>= \export ->
+  writeExport path >>= \export ->
     let
-      toReadable =
-        \(number, annotation) -> show number ++ ": " ++ (elide . excerpt) annotation
+      toReadable = \(number, annotation) ->
+        show number ++ ". " ++ (elide . excerpt) annotation
     in
       case export of
         Just (Export (Metadata author title) annotations) ->
-             putStrLn ("Excerpts from '" ++ title ++ "' by '" ++ author ++ "'.")
-          >> (mapM_ putStrLn . map toReadable) (zip [1..] annotations)
-        Nothing -> return ()
+          putStrLn ("Excerpts from '" ++ title ++ "' by '" ++ author ++ "':")
+            >> (mapM_ putStrLn . map toReadable) (zip [1..] annotations)
+        Nothing
+          -> putStrLn "Parse error, see 'kindle.log' for details."
