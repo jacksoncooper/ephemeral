@@ -4,7 +4,11 @@ import Data.Char (toLower, toUpper)
 
 import Report (Report(..), labelAndItemize)
 
-data Color = Pink | Blue | Yellow | Orange
+data Color =
+    Pink
+  | Blue
+  | Yellow
+  | Orange
   deriving Show
 
 type Location = String

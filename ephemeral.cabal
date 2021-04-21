@@ -19,9 +19,10 @@ source-repository head
 
 library
   exposed-modules:
+      Interface
       Kindle
-      Lib
       Report
+      Word
   other-modules:
       Paths_ephemeral
   hs-source-dirs:

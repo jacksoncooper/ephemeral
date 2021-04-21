@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import Interface (start)
 
 main :: IO ()
-main = someFunc
+main = start
