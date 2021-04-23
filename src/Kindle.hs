@@ -1,4 +1,10 @@
-module Kindle where
+module Kindle
+  ( Annotation(..)
+  , Export(..)
+  , Metadata(..)
+  , excerpt
+  , writeExport
+  ) where
 
 import Data.Char (toLower, toUpper)
 
@@ -204,25 +210,24 @@ expectCells expected text =
 
 writeExport :: FilePath -> IO (Maybe Export)
 writeExport path =
-  let log = "kindle.log"
-  in
-    readFile path >>= \text ->
-      case toExport (lines text) of
-        Success export ->
-          return (Just export)
-        Error errors ->
-          writeFile log (unlines errors) >> return Nothing
+  readFile path >>= \text ->
+    case toExport (lines text) of
+      Success export -> return (Just export)
+      Error errors -> writeFile log (unlines errors) >> return Nothing
+  where
+    log = "kindle.txt"
 
 printExport :: FilePath -> IO ()
 printExport path =
   writeExport path >>= \export ->
-    let
+    case export of
+      Just (Export (Metadata author title) annotations) ->
+        doHeader >> doAnnotations
+        where
+          doHeader = putStrLn ("Excerpts from '" ++ title ++ "' by '" ++ author ++ "':")
+          doAnnotations = (mapM_ putStrLn . map toReadable) (zip [1..] annotations)
+      Nothing ->
+        putStrLn "Parse error, see 'kindle.log' for details."
+    where
       toReadable = \(number, annotation) ->
         show number ++ ". " ++ (elide . excerpt) annotation
-    in
-      case export of
-        Just (Export (Metadata author title) annotations) ->
-          putStrLn ("Excerpts from '" ++ title ++ "' by '" ++ author ++ "':")
-            >> (mapM_ putStrLn . map toReadable) (zip [1..] annotations)
-        Nothing
-          -> putStrLn "Parse error, see 'kindle.log' for details."
