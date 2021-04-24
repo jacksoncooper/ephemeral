@@ -4,8 +4,8 @@ module Interface
 
 import Data.List (intercalate)
 
-import Kindle (writeExport)
-import Word (toWords)
+import Kindle as K
+import Word as W
 
 data Menu =
     Review
@@ -13,20 +13,12 @@ data Menu =
   | Unknown
   deriving Show
 
-prompt :: IO String
-prompt = putStr "> " >> getLine
-
 start :: IO ()
 start =
   menu >>= \choice ->
     case choice of
-      Kindle -> do
-        putStrLn "Please enter the path to the Kindle export."
-        path <- prompt
-        export <- writeExport path
-        case export of
-          Just export' -> return (toWords export') >> return ()
-          Nothing -> return ()
+      Kindle ->
+        kindleImport >> return ()
       Review ->
         putStrLn "Not implemented."
       Unknown ->
@@ -46,3 +38,13 @@ menu =
       , "  [1] Review."
       , "  [2] Import from Kindle."
       ]
+
+kindleImport :: IO (Maybe [W.Word])
+kindleImport = do
+  putStrLn "Please enter the path to the Kindle export."
+  path <- prompt
+  export <- K.writeExport path
+  return (K.toWords <$> export)
+
+prompt :: IO String
+prompt = putStr "> " >> getLine

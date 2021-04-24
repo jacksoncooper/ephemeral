@@ -1,7 +1,4 @@
-module Report
-  ( Report(..)
-  , labelAndItemize
-  ) where
+module Report where
 
 data Report a =
     Success a

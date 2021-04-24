@@ -1,14 +1,13 @@
 module Kindle
-  ( Annotation(..)
-  , Export(..)
-  , Metadata(..)
-  , excerpt
-  , writeExport
+  ( writeExport
+  , toWords
   ) where
 
 import Data.Char (toLower, toUpper)
 
-import Report (Report(..), labelAndItemize)
+import Export
+import Report
+import Word as W
 
 data Color =
     Pink
@@ -31,16 +30,7 @@ data Type
   | Note'
   deriving Show
 
-type Author = String
-type Title = String
-
-data Metadata =
-  Metadata Author Title
-  deriving Show
-
-data Export =
-  Export Metadata [Annotation]
-  deriving Show
+type Kindle = Export [Annotation]
 
 excerpt :: Annotation -> String
 excerpt (Highlight _ _ _ excerpt) = excerpt
@@ -141,7 +131,7 @@ toMetadata lines' =
         author = expectCells 1 (lines' !! 2) >>= toAuthor . head
     in  Metadata <$> author <*> title
 
-toExport :: [String] -> Report Export
+toExport :: [String] -> Report Kindle
 toExport lines' =
     let
       preambleLength = 8
@@ -208,14 +198,28 @@ expectCells expected text =
   let cells = columns text in
   expectLength "attribute" "attributes" expected cells >> return cells
 
-writeExport :: FilePath -> IO (Maybe Export)
+writeExport :: FilePath -> IO (Maybe Kindle)
 writeExport path =
+  -- TODO: readFile throws an exception when given an improper file path.
+  -- Figure out how exceptions work in this language.
   readFile path >>= \text ->
     case toExport (lines text) of
       Success export -> return (Just export)
       Error errors -> writeFile log (unlines errors) >> return Nothing
   where
     log = "kindle.txt"
+
+toWords :: Kindle -> [W.Word]
+toWords (Export (Metadata author title) annotations) =
+  map word annotations
+  where
+    -- TODO: Note the duplicity of the RHS of the following equations. No good.
+    word (Highlight _ location _ excerpt) =
+      Word author title location excerpt
+    word (Note location _ excerpt) =
+      Word author title location excerpt
+
+-- For debugging.
 
 printExport :: FilePath -> IO ()
 printExport path =
