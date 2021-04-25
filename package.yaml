@@ -8,6 +8,7 @@ description: Dredge up highlighted words from e-books.
 
 dependencies:
 - base >= 4.7 && < 5
+- aeson >= 1.5.5.1
 
 library:
   source-dirs: src

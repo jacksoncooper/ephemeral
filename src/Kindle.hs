@@ -1,11 +1,11 @@
 module Kindle
-  ( writeExport
-  , toWords
+  ( readWords
   ) where
 
-import Data.Char (toLower, toUpper)
-
+import Data.Char (toLower)
 import Export
+import Format (elide, title)
+import Parse
 import Report
 import Word as W
 
@@ -36,42 +36,11 @@ excerpt :: Annotation -> String
 excerpt (Highlight _ _ _ excerpt) = excerpt
 excerpt (Note _ _ excerpt) = excerpt
 
-elide :: String -> String
-elide text =
-  let words' = words text
-  in
-    if length words' > 10
-    then (unwords . take 10) words' ++ "…"
-    else text
-
-capitalize :: String -> String
-capitalize (first : rest) = toUpper first : rest
-
-capitalize' :: String -> String
-capitalize' word =
-  let
-    conjunctions = ["and", "as", "but", "for", "if", "nor", "or", "so", "yet"]
-    articles = ["a", "an", "the"]
-    prepositions = ["as", "at", "by", "for", "in", "of", "off", "on", "per", "to", "up", "via"]
-    ignore = conjunctions ++ articles ++ prepositions
-  in
-    if word `elem` ignore
-    then word
-    else capitalize word
-
-title :: String -> String
-title text =
-  let
-    words' = words text
-    first : rest = words'
-  in
-    unwords (capitalize first : map capitalize' rest)
-
 toAuthor :: String -> Report String
 toAuthor  = Success . drop 1 . dropWhile (/= ' ')
 
 toTitle :: String -> Report String
-toTitle = Success . title . map toLower
+toTitle = Success . title
 
 toType :: String -> Report Type
 toType text =
@@ -98,7 +67,7 @@ toColor text =
       _        -> Error [error]
 
 toLocation :: String -> Report String
-toLocation = Success . map toLower
+toLocation = Success
 
 toStarred :: String -> Report Bool
 toStarred text =
@@ -131,8 +100,8 @@ toMetadata lines' =
         author = expectCells 1 (lines' !! 2) >>= toAuthor . head
     in  Metadata <$> author <*> title
 
-toExport :: [String] -> Report Kindle
-toExport lines' =
+toImport :: [String] -> Report Kindle
+toImport lines' =
     let
       preambleLength = 8
       preambleLines = take preambleLength lines'
@@ -154,76 +123,34 @@ toExport lines' =
       in
         Export <$> metadataReport <*> annotationsReport
 
-between :: Eq a => a -> a -> [a] -> [a]
-between start end =
-  takeWhile (/= end) . drop 1 . dropWhile (/= start)
-
-inParentheses :: String -> String
-inParentheses = between '(' ')'
-
-columns :: String -> [String]
-columns = map reverse . columns'
-
-columns' :: String -> [String]
-columns' = go False [] '"'
-  where
-    go :: Bool -> String -> Char -> String -> [String]
-    go _ _ _ [] = []
-    go consume column toggle (head : rest) =
-      if head == toggle then
-        let remaining = go (not consume) [] toggle rest in
-        if consume
-        then column : remaining
-        else remaining
-      else
-        if consume
-        then go True (head : column) toggle rest
-        else go False [] toggle rest
-
-expectLength :: String -> String -> Int -> [a] -> Report ()
-expectLength what whats expected items =
-  let
-    length' = length items
-    error =
-      "Expected " ++ show expected ++ " "
-        ++ (if expected == 1 then what else whats) ++ " but found "
-        ++ show length' ++ "."
-  in
-    if length' == expected
-    then Success ()
-    else Error [error]
-
-expectCells :: Int -> String -> Report [String]
-expectCells expected text =
-  let cells = columns text in
-  expectLength "attribute" "attributes" expected cells >> return cells
-
-writeExport :: FilePath -> IO (Maybe Kindle)
-writeExport path =
-  -- TODO: readFile throws an exception when given an improper file path.
-  -- Figure out how exceptions work in this language.
-  readFile path >>= \text ->
-    case toExport (lines text) of
-      Success export -> return (Just export)
-      Error errors -> writeFile log (unlines errors) >> return Nothing
-  where
-    log = "kindle.txt"
-
 toWords :: Kindle -> [W.Word]
 toWords (Export (Metadata author title) annotations) =
   map word annotations
   where
-    -- TODO: Note the duplicity of the RHS of the following equations. No good.
+    -- TODO: Note the duplicity of the RHS of the following equations. No good. You should revisit the annotation type.
     word (Highlight _ location _ excerpt) =
       Word author title location excerpt
     word (Note location _ excerpt) =
       Word author title location excerpt
 
--- For debugging.
+readKindle :: String -> FilePath -> IO (Maybe Kindle)
+readKindle log path =
+  -- TODO: readFile throws an exception when given an improper file path. Figure out how exceptions work in this language.
+  readFile path >>= \text ->
+    case toImport (lines text) of
+      Success export -> return (Just export)
+      Error errors -> writeFile log (unlines errors) >> return Nothing
 
-printExport :: FilePath -> IO ()
-printExport path =
-  writeExport path >>= \export ->
+readWords :: String -> FilePath -> IO (Maybe [W.Word])
+readWords log path = do
+  annotations <- readKindle log path
+  return (toWords <$> annotations)
+
+-- For debugging Kindle imports.
+
+printKindle :: FilePath -> IO ()
+printKindle path =
+  readKindle path log >>= \export ->
     case export of
       Just (Export (Metadata author title) annotations) ->
         doHeader >> doAnnotations
@@ -231,7 +158,8 @@ printExport path =
           doHeader = putStrLn ("Excerpts from '" ++ title ++ "' by '" ++ author ++ "':")
           doAnnotations = (mapM_ putStrLn . map toReadable) (zip [1..] annotations)
       Nothing ->
-        putStrLn "Parse error, see 'kindle.log' for details."
-    where
-      toReadable = \(number, annotation) ->
-        show number ++ ". " ++ (elide . excerpt) annotation
+        putStrLn ("Parse error, see '" ++ log ++ "' for details.")
+  where
+    log = "kindle.log"
+    toReadable = \(number, annotation) ->
+      show number ++ ". " ++ (elide . excerpt) annotation

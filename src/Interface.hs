@@ -3,9 +3,11 @@ module Interface
   ) where
 
 import Data.List (intercalate)
-
 import Kindle as K
 import Word as W
+import Storage (save)
+
+type Import = String -> String -> IO (Maybe [W.Word])
 
 data Menu =
     Review
@@ -18,7 +20,7 @@ start =
   menu >>= \choice ->
     case choice of
       Kindle ->
-        kindleImport >> return ()
+        doKindleImport
       Review ->
         putStrLn "Not implemented."
       Unknown ->
@@ -39,12 +41,24 @@ menu =
       , "  [2] Import from Kindle."
       ]
 
-kindleImport :: IO (Maybe [W.Word])
-kindleImport = do
-  putStrLn "Please enter the path to the Kindle export."
-  path <- prompt
-  export <- K.writeExport path
-  return (K.toWords <$> export)
-
 prompt :: IO String
 prompt = putStr "> " >> getLine
+
+doKindleImport :: IO ()
+doKindleImport =
+  doImport
+    "Please enter the path to the CSV file produced by your Kindle."
+    "kindle.log"
+    K.readWords
+
+doImport :: String -> String -> Import -> IO ()
+doImport message log how = do
+  putStrLn message
+  path <- prompt
+  import' <- how log path
+  case import' of
+    (Just words) -> save words >> putStrLn (success words)
+    Nothing -> putStrLn error
+  where
+    success words = "Successfully imported " ++ show (length words) ++ " words."
+    error = "Import failed. Please see '" ++ log ++ "' for details."
