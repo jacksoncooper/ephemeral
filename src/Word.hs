@@ -3,12 +3,14 @@
 module Word where
 
 import Prelude hiding (Word)
-import Synonyms
 import Data.Aeson
 
-data Word =
-  Word Author Title Location Excerpt
-  deriving Show
+data Word = Word
+  { author :: String
+  , title :: String
+  , location :: String
+  , excerpt :: String
+  } deriving Show
 
 instance ToJSON Word where
   toJSON (Word author title location excerpt) =
@@ -18,3 +20,10 @@ instance ToJSON Word where
       , "location" .= location
       , "excerpt"  .= excerpt
       ]
+
+instance FromJSON Word where
+  parseJSON = withObject "Word" $ \value -> Word
+    <$> value .: "author"
+    <*> value .: "title"
+    <*> value .: "location"
+    <*> value .: "excerpt"

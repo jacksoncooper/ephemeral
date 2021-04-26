@@ -3,9 +3,10 @@ module Interface
   ) where
 
 import Data.List (intercalate)
-import Kindle as K
-import Word as W
-import Storage (save)
+import qualified Format as F
+import qualified Kindle as K
+import qualified Storage as S
+import qualified Word as W
 
 type Import = String -> String -> IO (Maybe [W.Word])
 
@@ -16,15 +17,12 @@ data Menu =
   deriving Show
 
 start :: IO ()
-start =
-  menu >>= \choice ->
-    case choice of
-      Kindle ->
-        doKindleImport
-      Review ->
-        putStrLn "Not implemented."
-      Unknown ->
-        putStrLn "Not implemented."
+start = do
+  choice <- menu
+  case choice of
+    Review  -> putStrLn "Not implemented."
+    Kindle  -> doKindleImport
+    Unknown -> start
 
 menu :: IO Menu
 menu =
@@ -57,8 +55,21 @@ doImport message log how = do
   path <- prompt
   import' <- how log path
   case import' of
-    (Just words) -> save words >> putStrLn (success words)
-    Nothing -> putStrLn error
+    (Just excerpts) ->
+      S.save words' >> putStrLn (success words')
+      where
+        words' = vocabulary excerpts
+    Nothing ->
+      putStrLn error
   where
     success words = "Successfully imported " ++ show (length words) ++ " words."
     error = "Import failed. Please see '" ++ log ++ "' for details."
+
+vocabulary :: [W.Word] -> [W.Word]
+vocabulary =
+  (map stripWord) . filter smallWord
+  where
+    smallWord word =
+      length ((words . W.excerpt) word) <= 3
+    stripWord word@(W.Word { W.excerpt = excerpt })
+      = word { W.excerpt = F.strip excerpt }

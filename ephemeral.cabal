@@ -20,11 +20,12 @@ source-repository head
 library
   exposed-modules:
       Export
+      Format
       Interface
       Kindle
+      Parse
       Report
       Storage
-      Synonyms
       Word
   other-modules:
       Paths_ephemeral

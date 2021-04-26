@@ -1,10 +1,9 @@
 module Export where
 
-import Synonyms
-
-data Metadata =
-  Metadata Author Title
-  deriving Show
+data Metadata = Metadata
+  { author :: String
+  , title :: String
+  } deriving Show
 
 data Export a =
   Export Metadata a

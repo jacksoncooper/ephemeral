@@ -4,10 +4,10 @@ module Kindle
 
 import Data.Char (toLower)
 import Export
-import Format (elide, title)
+import qualified Format as F
 import Parse
 import Report
-import Word as W
+import qualified Word as W
 
 data Color =
     Pink
@@ -40,7 +40,7 @@ toAuthor :: String -> Report String
 toAuthor  = Success . drop 1 . dropWhile (/= ' ')
 
 toTitle :: String -> Report String
-toTitle = Success . title
+toTitle = Success . F.title
 
 toType :: String -> Report Type
 toType text =
@@ -129,9 +129,9 @@ toWords (Export (Metadata author title) annotations) =
   where
     -- TODO: Note the duplicity of the RHS of the following equations. No good. You should revisit the annotation type.
     word (Highlight _ location _ excerpt) =
-      Word author title location excerpt
+      W.Word author title location excerpt
     word (Note location _ excerpt) =
-      Word author title location excerpt
+      W.Word author title location excerpt
 
 readKindle :: String -> FilePath -> IO (Maybe Kindle)
 readKindle log path =
@@ -162,4 +162,4 @@ printKindle path =
   where
     log = "kindle.log"
     toReadable = \(number, annotation) ->
-      show number ++ ". " ++ (elide . excerpt) annotation
+      show number ++ ". " ++ (F.elide . excerpt) annotation
