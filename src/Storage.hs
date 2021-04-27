@@ -1,5 +1,6 @@
 module Storage
-  ( save
+  ( load
+  , save
   ) where
 
 import Data.Aeson (decodeFileStrict, encodeFile)
@@ -12,9 +13,11 @@ save :: [W.Word] -> IO ()
 save words =
   encodeFile store words
 
+-- TODO:
+--   - 'decodeFileStrict' throws an exception when the file does not exist.
+--   - Display the error message in Aeson's parser to the user.
+--     Use 'eitherDecodeFileStrict'.
+
 load :: IO (Maybe [W.Word])
 load =
   decodeFileStrict store
-
-merge :: [W.Word] -> [W.Word] -> [W.Word]
-merge = undefined

@@ -7,8 +7,9 @@ extra-source-files:
 description: Dredge up highlighted words from e-books.
 
 dependencies:
-- base >= 4.7 && < 5
+- base  >= 4.7 && < 5
 - aeson >= 1.5.5.1
+- time  >= 1.9.3
 
 library:
   source-dirs: src

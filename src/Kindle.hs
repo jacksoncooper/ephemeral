@@ -129,9 +129,9 @@ toWords (Export (Metadata author title) annotations) =
   where
     -- TODO: Note the duplicity of the RHS of the following equations. No good. You should revisit the annotation type.
     word (Highlight _ location _ excerpt) =
-      W.Word author title location excerpt
+      W.Word author title location excerpt Nothing
     word (Note location _ excerpt) =
-      W.Word author title location excerpt
+      W.Word author title location excerpt Nothing
 
 readKindle :: String -> FilePath -> IO (Maybe Kindle)
 readKindle log path =
