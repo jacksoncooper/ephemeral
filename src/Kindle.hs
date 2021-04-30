@@ -127,7 +127,8 @@ toWords :: Kindle -> [W.Word]
 toWords (Export (Metadata author title) annotations) =
   map word annotations
   where
-    -- TODO: Note the duplicity of the RHS of the following equations. No good. You should revisit the annotation type.
+    -- TODO: Note the duplicity of the RHS of the following equations.
+    -- No good. You should revisit the annotation type.
     word (Highlight _ location _ excerpt) =
       W.Word author title location excerpt Nothing
     word (Note location _ excerpt) =
@@ -135,7 +136,8 @@ toWords (Export (Metadata author title) annotations) =
 
 readKindle :: String -> FilePath -> IO (Maybe Kindle)
 readKindle log path =
-  -- TODO: readFile throws an exception when given an improper file path. Figure out how exceptions work in this language.
+  -- TODO: readFile throws an exception when given an improper file path.
+  -- Figure out how exceptions work in this language.
   readFile path >>= \text ->
     case toImport (lines text) of
       Success export -> return (Just export)

@@ -4,6 +4,10 @@ module Interface
 
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
+import System.Environment (getArgs)
+import System.IO (BufferMode(NoBuffering), stdout, hSetBuffering)
+import System.Random (randomRIO)
+
 import qualified Format as F
 import qualified Kindle as K
 import qualified Storage as S
@@ -14,17 +18,43 @@ type Import = String -> String -> IO (Maybe [W.Word])
 data Menu =
     Review
   | Kindle
+  | Exit
   | Unknown
   deriving Show
 
 start :: IO ()
 start = do
+  hSetBuffering stdout NoBuffering
   existing <- S.load
   let words' = fromMaybe [] existing
+  arguments <- getArgs
+  case (length arguments) of
+    0 -> manage words'
+    1 ->
+      if arguments !! 0 == "--select"
+      then select words'
+      else doNothing
+    _ -> doNothing
+    where
+      doNothing = putStrLn "usage: ephemeral [ --select ]"
+
+select :: [W.Word] -> IO ()
+select words' =
+  if length words' > 0
+  then
+    do
+      selection <- randomRIO (0, length words' - 1)
+      print (words' !! selection)
+  else
+    putStrLn "Error: Cannot --select from no words."
+
+manage :: [W.Word] -> IO ()
+manage words' = do
   choice <- menu
   case choice of
     Review  -> putStrLn "Not implemented."
     Kindle  -> doKindleImport words'
+    Exit    -> return ()
     Unknown -> start
 
 menu :: IO Menu
@@ -33,6 +63,7 @@ menu =
     case choice of
       "1" -> return Review
       "2" -> return Kindle
+      "3" -> return Exit
       _   -> return Unknown
   where
     doChoice = putStrLn message >> prompt
@@ -40,6 +71,7 @@ menu =
       [ "Please select from the following options."
       , "  [1] Review."
       , "  [2] Import from Kindle."
+      , "  [3] Exit."
       ]
 
 prompt :: IO String
