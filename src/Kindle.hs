@@ -3,6 +3,7 @@ module Kindle
   ) where
 
 import Data.Char (toLower)
+
 import Export
 import qualified Format as F
 import Parse
@@ -137,7 +138,6 @@ toWords (Export (Metadata author title) annotations) =
 readKindle :: String -> FilePath -> IO (Maybe Kindle)
 readKindle log path =
   -- TODO: readFile throws an exception when given an improper file path.
-  -- Figure out how exceptions work in this language.
   readFile path >>= \text ->
     case toImport (lines text) of
       Success export -> return (Just export)

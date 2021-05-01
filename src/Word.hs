@@ -3,6 +3,7 @@
 module Word where
 
 import Prelude hiding (Word)
+
 import Data.Aeson
 import Data.Time.Clock (UTCTime)
 

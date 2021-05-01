@@ -5,6 +5,7 @@ module Storage
 
 import Control.Exception (IOException, catch)
 import Data.Aeson (decodeFileStrict, encodeFile)
+
 import qualified Word as W
 
 store :: String

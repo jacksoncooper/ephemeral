@@ -11,6 +11,7 @@ import System.Random (randomRIO)
 import qualified Format as F
 import qualified Kindle as K
 import qualified Storage as S
+import qualified Template as T
 import qualified Word as W
 
 type Import = String -> String -> IO (Maybe [W.Word])
@@ -43,8 +44,10 @@ select words' =
   if length words' > 0
   then
     do
+      -- TODO: Update seen attribute and retry until we pick one that has not
+      -- been recently seen.
       selection <- randomRIO (0, length words' - 1)
-      print (words' !! selection)
+      T.writeHTML (words' !! selection)
   else
     putStrLn "Error: Cannot --select from no words."
 
