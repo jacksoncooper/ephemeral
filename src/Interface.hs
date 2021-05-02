@@ -42,12 +42,10 @@ start = do
 select :: [W.Word] -> IO ()
 select words' =
   if length words' > 0
-  then
-    do
-      -- TODO: Update seen attribute and retry until we pick one that has not
-      -- been recently seen.
-      selection <- randomRIO (0, length words' - 1)
-      T.writeHTML (words' !! selection)
+  then do
+    -- TODO: Shuffle instead, process each element one by one.
+    selection <- randomRIO (0, length words' - 1)
+    T.writeHTML (words' !! selection)
   else
     putStrLn "Error: Cannot --select from no words."
 

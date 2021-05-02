@@ -22,14 +22,18 @@ template = [r|<!DOCTYPE html>
   <body>
     <p>%s</p>
     <p>From <em>%s</em> by %s (%s).</p>
-    <a href="https://www.merriam-webster.com/dictionary/%s">Define.</a>
+    <p>
+      Define with
+      <a href="https://www.merriam-webster.com/dictionary/%s">Merriam-Webster</a> or
+      <a href="https://www.google.com/search?q=%s">Oxford Languages</a>.
+    </p>
   </body>
 </html>
 |]
 
 makeHTML :: W.Word -> String
 makeHTML (W.Word author title location excerpt seen) =
-  printf template excerpt excerpt title author location excerpt
+  printf template excerpt excerpt title author location excerpt excerpt
 
 writeHTML :: W.Word -> IO ()
 writeHTML word =

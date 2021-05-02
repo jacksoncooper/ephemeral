@@ -5,7 +5,7 @@ module Word where
 import Prelude hiding (Word)
 
 import Data.Aeson
-import Data.Time.Clock (UTCTime)
+import Data.Time.Clock (UTCTime(..), getCurrentTime)
 
 data Word = Word
   { author   :: String
@@ -32,3 +32,9 @@ instance FromJSON Word where
     <*> value .: "location"
     <*> value .: "excerpt"
     <*> value .: "seen"
+
+see :: Word -> IO Word
+see word = do
+  (UTCTime day _) <- getCurrentTime
+  let time = UTCTime day 0
+  return (word { seen = Just time })
