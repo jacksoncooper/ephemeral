@@ -4,6 +4,8 @@ module Interface
 
 import Data.List (intercalate)
 import Data.Maybe (fromMaybe)
+import Data.Time.Calendar (Day, diffDays)
+import Data.Time.Clock (UTCTime(..), getCurrentTime)
 import System.Environment (getArgs)
 import System.IO (BufferMode(NoBuffering), stdout, hSetBuffering)
 import System.Random (randomRIO)
@@ -32,22 +34,47 @@ start = do
   case (length arguments) of
     0 -> manage words'
     1 ->
-      if arguments !! 0 == "--select"
+      if argument == "--select"
       then select words'
-      else doNothing
-    _ -> doNothing
-    where
-      doNothing = putStrLn "usage: ephemeral [ --select ]"
+      else putStrLn ("Unknown argument, expected --select.")
+      where
+        argument = arguments !! 0
+    _ ->
+      putStrLn "Expected one argument."
 
 select :: [W.Word] -> IO ()
 select words' =
   if length words' > 0
   then do
-    -- TODO: Shuffle instead, process each element one by one.
-    selection <- randomRIO (0, length words' - 1)
-    T.writeHTML (words' !! selection)
+    (UTCTime now _) <- getCurrentTime
+    (word, updated) <- select' [] now words'
+    _ <- S.save updated
+    maybe
+      (putStrLn "All words reviewed, come back later or import some fresh ones.")
+      (\word' -> T.writeHTML word' >>= \_ -> return ())
+      word
   else
-    putStrLn "Error: Cannot --select from no words."
+    putStrLn "Cannot --select from no words."
+
+select' :: [W.Word] -> Day -> [W.Word] -> IO (Maybe W.Word, [W.Word])
+select' visited _ [] = return (Nothing, visited)
+select' visited now words' =
+  randomRIO (1, length words') >>= \size ->
+    let
+      (including, rest) = splitAt size words'
+      excluding = init including
+      unvisited = excluding ++ rest
+      word = last including
+      seen = word { W.seen = Just now }
+      tryAgain = select' (seen : visited) now unvisited
+      foundIt = return (Just word, seen : visited ++ unvisited)
+    in
+      case W.seen word of
+        Just day ->
+          if diffDays now day > 21
+          then foundIt
+          else tryAgain
+        Nothing -> foundIt
 
 manage :: [W.Word] -> IO ()
 manage words' = do
@@ -86,10 +113,10 @@ doKindleImport =
     K.readWords
 
 doImport :: String -> String -> Import -> [W.Word] -> IO ()
-doImport message log how existing = do
+doImport message log' how existing = do
   putStrLn message
   path <- prompt
-  import' <- how log path
+  import' <- how log' path
   case import' of
     (Just excerpts) ->
       -- TODO: This sort of concatenation is really inefficient and requires
@@ -98,10 +125,10 @@ doImport message log how existing = do
       where
         words' = vocabulary excerpts
     Nothing ->
-      putStrLn error
+      putStrLn error'
   where
-    success words = "Successfully imported " ++ show (length words) ++ " words."
-    error = "Import failed. Please see '" ++ log ++ "' for details."
+    success words' = "Successfully imported " ++ show (length words') ++ " words."
+    error' = "Import failed. Please see '" ++ log' ++ "' for details."
 
 vocabulary :: [W.Word] -> [W.Word]
 vocabulary =

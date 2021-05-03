@@ -13,6 +13,10 @@ dependencies:
 - random         >= 1.1
 - time           >= 1.9.3
 
+ghc-options:
+- -Wall
+- -Werror
+
 library:
   source-dirs: src
 

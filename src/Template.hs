@@ -32,7 +32,7 @@ template = [r|<!DOCTYPE html>
 |]
 
 makeHTML :: W.Word -> String
-makeHTML (W.Word author title location excerpt seen) =
+makeHTML (W.Word author title location excerpt _) =
   printf template excerpt excerpt title author location excerpt excerpt
 
 writeHTML :: W.Word -> IO ()
