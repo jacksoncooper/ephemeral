@@ -1,5 +1,7 @@
 module Parse where
 
+import Prelude hiding (error)
+
 import Report
 
 between :: Eq a => a -> a -> [a] -> [a]
@@ -17,15 +19,15 @@ columns' = go False [] '"'
   where
     go :: Bool -> String -> Char -> String -> [String]
     go _ _ _ [] = []
-    go consume column toggle (head : rest) =
-      if head == toggle then
+    go consume column toggle (character : rest) =
+      if character == toggle then
         let remaining = go (not consume) [] toggle rest in
         if consume
         then column : remaining
         else remaining
       else
         if consume
-        then go True (head : column) toggle rest
+        then go True (character : column) toggle rest
         else go False [] toggle rest
 
 expectLength :: String -> String -> Int -> [a] -> Report ()

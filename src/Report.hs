@@ -7,7 +7,7 @@ data Report a =
 
 instance Functor Report where
   fmap f (Success a) = Success (f a)
-  fmap f (Error errors) = Error errors
+  fmap _ (Error errors) = Error errors
 
 instance Applicative Report where
   pure = Success

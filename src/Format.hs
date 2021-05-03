@@ -6,6 +6,7 @@ module Format
 
 import Data.Char (isLetter, toLower, toUpper)
 import Data.List (dropWhileEnd)
+import Prelude hiding (error)
 
 elide :: String -> String
 elide text =
@@ -29,6 +30,7 @@ strip =
     notLetter = not . isLetter
 
 capitalize :: String -> String
+capitalize "" = ""
 capitalize (first : rest) = toUpper first : rest
 
 capitalize' :: String -> String

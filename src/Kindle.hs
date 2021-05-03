@@ -3,8 +3,9 @@ module Kindle
   ) where
 
 import Data.Char (toLower)
+import Prelude hiding (error, log)
 
-import Export
+import qualified Export as E
 import qualified Format as F
 import Parse
 import Report
@@ -31,11 +32,7 @@ data Type
   | Note'
   deriving Show
 
-type Kindle = Export [Annotation]
-
-excerpt :: Annotation -> String
-excerpt (Highlight _ _ _ excerpt) = excerpt
-excerpt (Note _ _ excerpt) = excerpt
+type Kindle = E.Export [Annotation]
 
 toAuthor :: String -> Report String
 toAuthor  = Success . drop 1 . dropWhile (/= ' ')
@@ -95,11 +92,11 @@ toAnnotation text =
           Note <$> location <*> starred <*> excerpt
         Error errors -> Error errors
 
-toMetadata :: [String] -> Report Metadata
+toMetadata :: [String] -> Report E.Metadata
 toMetadata lines' =
     let title  = expectCells 1 (lines' !! 1) >>= toTitle . head
         author = expectCells 1 (lines' !! 2) >>= toAuthor . head
-    in  Metadata <$> author <*> title
+    in  E.Metadata <$> author <*> title
 
 toImport :: [String] -> Report Kindle
 toImport lines' =
@@ -122,10 +119,10 @@ toImport lines' =
           (expectLength "line" "lines" preambleLength preambleLines
             >> toMetadata preambleLines)
       in
-        Export <$> metadataReport <*> annotationsReport
+        E.Export <$> metadataReport <*> annotationsReport
 
 toWords :: Kindle -> [W.Word]
-toWords (Export (Metadata author title) annotations) =
+toWords (E.Export (E.Metadata author title) annotations) =
   map word annotations
   where
     -- TODO: Note the duplicity of the RHS of the following equations.
@@ -147,21 +144,3 @@ readWords :: String -> FilePath -> IO (Maybe [W.Word])
 readWords log path = do
   annotations <- readKindle log path
   return (toWords <$> annotations)
-
--- For debugging Kindle imports.
-
-printKindle :: FilePath -> IO ()
-printKindle path =
-  readKindle path log >>= \export ->
-    case export of
-      Just (Export (Metadata author title) annotations) ->
-        doHeader >> doAnnotations
-        where
-          doHeader = putStrLn ("Excerpts from '" ++ title ++ "' by '" ++ author ++ "':")
-          doAnnotations = (mapM_ putStrLn . map toReadable) (zip [1..] annotations)
-      Nothing ->
-        putStrLn ("Parse error, see '" ++ log ++ "' for details.")
-  where
-    log = "kindle.log"
-    toReadable = \(number, annotation) ->
-      show number ++ ". " ++ (F.elide . excerpt) annotation

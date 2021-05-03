@@ -48,10 +48,10 @@ select words' =
   then do
     (UTCTime now _) <- getCurrentTime
     (word, updated) <- select' [] now words'
-    _ <- S.save updated
+    S.save updated
     maybe
       (putStrLn "All words reviewed, come back later or import some fresh ones.")
-      (\word' -> T.writeHTML word' >>= \_ -> return ())
+      T.writeHTML
       word
   else
     putStrLn "Cannot --select from no words."
@@ -67,7 +67,7 @@ select' visited now words' =
       word = last including
       seen = word { W.seen = Just now }
       tryAgain = select' (seen : visited) now unvisited
-      foundIt = return (Just word, seen : visited ++ unvisited)
+      foundIt = return (Just seen, seen : visited ++ unvisited)
     in
       case W.seen word of
         Just day ->
