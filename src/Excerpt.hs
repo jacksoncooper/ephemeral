@@ -1,13 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Word where
-
-import Prelude hiding (Word)
+module Excerpt where
 
 import Data.Aeson
 import Data.Time.Calendar (Day)
 
-data Word = Word
+data Excerpt = Excerpt
   { author   :: String
   , title    :: String
   , location :: String
@@ -15,8 +13,8 @@ data Word = Word
   , seen     :: (Maybe Day)
   } deriving Show
 
-instance ToJSON Word where
-  toJSON (Word author' title' location' excerpt' seen') =
+instance ToJSON Excerpt where
+  toJSON (Excerpt author' title' location' excerpt' seen') =
     object
       [ "author"   .= author'
       , "title"    .= title'
@@ -25,8 +23,8 @@ instance ToJSON Word where
       , "seen"     .= seen'
       ]
 
-instance FromJSON Word where
-  parseJSON = withObject "Word" $ \value -> Word
+instance FromJSON Excerpt where
+  parseJSON = withObject "Excerpt" $ \value -> Excerpt
     <$> value .: "author"
     <*> value .: "title"
     <*> value .: "location"

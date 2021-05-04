@@ -5,11 +5,11 @@ module Kindle
 import Data.Char (toLower)
 import Prelude hiding (error, log)
 
-import qualified Export as E
+import qualified Excerpt as E
+import Export hiding (author, title)
 import qualified Format as F
 import Parse
 import Report
-import qualified Word as W
 
 data Color =
     Pink
@@ -32,7 +32,7 @@ data Type
   | Note'
   deriving Show
 
-type Kindle = E.Export [Annotation]
+type Kindle = Export [Annotation]
 
 toAuthor :: String -> Report String
 toAuthor  = Success . drop 1 . dropWhile (/= ' ')
@@ -92,11 +92,11 @@ toAnnotation text =
           Note <$> location <*> starred <*> excerpt
         Error errors -> Error errors
 
-toMetadata :: [String] -> Report E.Metadata
+toMetadata :: [String] -> Report Metadata
 toMetadata lines' =
     let title  = expectCells 1 (lines' !! 1) >>= toTitle . head
         author = expectCells 1 (lines' !! 2) >>= toAuthor . head
-    in  E.Metadata <$> author <*> title
+    in Metadata <$> author <*> title
 
 toImport :: [String] -> Report Kindle
 toImport lines' =
@@ -119,18 +119,18 @@ toImport lines' =
           (expectLength "line" "lines" preambleLength preambleLines
             >> toMetadata preambleLines)
       in
-        E.Export <$> metadataReport <*> annotationsReport
+        Export <$> metadataReport <*> annotationsReport
 
-toWords :: Kindle -> [W.Word]
-toWords (E.Export (E.Metadata author title) annotations) =
+toWords :: Kindle -> [E.Excerpt]
+toWords (Export (Metadata author title) annotations) =
   map word annotations
   where
     -- TODO: Note the duplicity of the RHS of the following equations.
     -- No good. You should revisit the annotation type.
     word (Highlight _ location _ excerpt) =
-      W.Word author title location excerpt Nothing
+      E.Excerpt author title location excerpt Nothing
     word (Note location _ excerpt) =
-      W.Word author title location excerpt Nothing
+      E.Excerpt author title location excerpt Nothing
 
 readKindle :: String -> FilePath -> IO (Maybe Kindle)
 readKindle log path =
@@ -140,7 +140,7 @@ readKindle log path =
       Success export -> return (Just export)
       Error errors -> writeFile log (unlines errors) >> return Nothing
 
-readWords :: String -> FilePath -> IO (Maybe [W.Word])
+readWords :: String -> FilePath -> IO (Maybe [E.Excerpt])
 readWords log path = do
   annotations <- readKindle log path
   return (toWords <$> annotations)

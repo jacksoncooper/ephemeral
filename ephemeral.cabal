@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.34.3.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 9f86daec324932ddce9955818386e0c536b83507f017e49cb18eecb6556868ae
+-- hash: a1bcf8d1cb88dc0b8c1ae442ae30802a61f030b45e98a8791a744dc9126b434c
 
 name:           ephemeral
 version:        0.0.0
@@ -21,6 +21,7 @@ source-repository head
 
 library
   exposed-modules:
+      Excerpt
       Export
       Format
       Interface
@@ -29,7 +30,6 @@ library
       Report
       Storage
       Template
-      Word
   other-modules:
       Paths_ephemeral
   hs-source-dirs:

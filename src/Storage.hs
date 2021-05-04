@@ -6,12 +6,12 @@ module Storage
 import Control.Exception (IOException, catch)
 import Data.Aeson (decodeFileStrict, encodeFile)
 
-import qualified Word as W
+import Excerpt
 
 store :: String
 store = "highlights.json"
 
-save :: [W.Word] -> IO ()
+save :: [Excerpt] -> IO ()
 save words' =
   doWrite -- `catch` badWrite
   where
@@ -23,11 +23,11 @@ save words' =
 -- TODO: Display the error message in Aeson's parser to the user.
 -- Use 'eitherDecodeFileStrict'.
 
-load :: IO (Maybe [W.Word])
+load :: IO (Maybe [Excerpt])
 load =
   doRead `catch` badRead
   where
     doRead = decodeFileStrict store
 
-badRead :: IOException -> IO (Maybe [W.Word])
+badRead :: IOException -> IO (Maybe [Excerpt])
 badRead _ = return (Just [])

@@ -7,7 +7,7 @@ module Template
 import Text.Printf (printf)
 import Text.RawString.QQ
 
-import qualified Word as W
+import qualified Excerpt as E
 
 path :: String
 path = "word.html"
@@ -31,11 +31,11 @@ template = [r|<!DOCTYPE html>
 </html>
 |]
 
-makeHTML :: W.Word -> String
-makeHTML (W.Word author title location excerpt _) =
+makeHTML :: E.Excerpt -> String
+makeHTML (E.Excerpt author title location excerpt _) =
   printf template excerpt excerpt title author location excerpt excerpt
 
-writeHTML :: W.Word -> IO ()
+writeHTML :: E.Excerpt -> IO ()
 writeHTML word =
     -- TODO: writeFile throws an exception when permissions are wonky.
   writeFile path (makeHTML word)
