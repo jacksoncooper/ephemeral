@@ -132,7 +132,7 @@ toWords (Export (Metadata author title) annotations) =
     word (Note location _ excerpt) =
       E.Excerpt author title location excerpt Nothing
 
-readKindle :: String -> FilePath -> IO (Maybe Kindle)
+readKindle :: FilePath -> FilePath -> IO (Maybe Kindle)
 readKindle log path =
   -- TODO: readFile throws an exception when given an improper file path.
   readFile path >>= \text ->
@@ -140,7 +140,7 @@ readKindle log path =
       Success export -> return (Just export)
       Error errors -> writeFile log (unlines errors) >> return Nothing
 
-readWords :: String -> FilePath -> IO (Maybe [E.Excerpt])
+readWords :: FilePath -> FilePath -> IO (Maybe [E.Excerpt])
 readWords log path = do
   annotations <- readKindle log path
   return (toWords <$> annotations)
