@@ -9,7 +9,7 @@
 
 - Amazon's Kindle, with `--kindle-import`. [1]
 
-![An HTML file produced by ephemeral showing the word "chicanery".](https://www.dropbox.com/s/zm1zfx41aigrhs8/word.png?raw=1)
+![An HTML file produced by ephemeral showing the word "chicanery".](https://i.imgur.com/Zje30bG.png)
 
 [1] Until they break my CSV parser. Please make a Kindle API, Amazon.
 
